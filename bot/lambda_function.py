@@ -4,6 +4,7 @@ import requests
 import paramiko
 import boto3
 import os
+import base64
 from io import BytesIO
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes
@@ -11,12 +12,15 @@ from telegram.ext.filters import Text
 import asyncio
 import traceback
 
+# Version: v0.8
+# Changes:
+# - Removed S3 dependency for SSH key storage
+# - SSH key is now loaded from Lambda environment variable (SSH_KEY in Base64)
+
 # Constants
 # Replace the following with your own values
 TELEGRAM_TOKEN = "YOUR_TOKEN_HERE"  # Your Telegram bot token
 ALLOWED_CHAT_ID = "YOUR_CHAT_ID_HERE"  # Your Telegram chat ID
-S3_BUCKET = "YOUR_S3_BUCKET"  # Your S3 bucket name for storing SSH key
-S3_KEY_PATH = "YOUR_S3_KEY_PATH"  # Path to your SSH key in S3 (e.g., "my-key.pem")
 SSH_USER = "Ubuntu"  # SSH user for EC2 instance (adjust if needed)
 PEERS_DIR = "/home/ubuntu/wireguard/wireguard"  # Directory for WireGuard peers (adjust if needed)
 DOCKER_COMPOSE_DIR = "/home/ubuntu/wireguard"  # Directory for docker-compose.yml (adjust if needed)
@@ -170,9 +174,16 @@ async def stop_ec2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if ec2_ip:
             # Delete the peers folder before shutdown
             log(f"SSH clear_peers before shutdown, IP: {ec2_ip}")
-            s3 = boto3.client("s3")
+            # Load SSH key from environment variable (expected to be Base64-encoded)
+            ssh_key_b64 = os.getenv("SSH_KEY")
+            if not ssh_key_b64:
+                log("SSH_KEY environment variable not set")
+                await update.message.reply_text("Error: SSH_KEY environment variable not set!", reply_markup=MAIN_KEYBOARD)
+                return
+            ssh_key = base64.b64decode(ssh_key_b64).decode("utf-8")
             key_file = "/tmp/wireguard-key.pem"
-            s3.download_file(S3_BUCKET, S3_KEY_PATH, key_file)
+            with open(key_file, "w") as f:
+                f.write(ssh_key)
             os.chmod(key_file, 0o400)
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -225,9 +236,16 @@ async def get_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         
         log(f"SSH get_files, IP: {ec2_ip}")
-        s3 = boto3.client("s3")
+        # Load SSH key from environment variable (expected to be Base64-encoded)
+        ssh_key_b64 = os.getenv("SSH_KEY")
+        if not ssh_key_b64:
+            log("SSH_KEY environment variable not set")
+            await update.message.reply_text("Error: SSH_KEY environment variable not set!", reply_markup=MAIN_KEYBOARD)
+            return
+        ssh_key = base64.b64decode(ssh_key_b64).decode("utf-8")
         key_file = "/tmp/wireguard-key.pem"
-        s3.download_file(S3_BUCKET, S3_KEY_PATH, key_file)
+        with open(key_file, "w") as f:
+            f.write(ssh_key)
         os.chmod(key_file, 0o400)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -313,9 +331,16 @@ async def get_instance_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         uptime = "Could not retrieve uptime (instance not running)"
         peers_info = "Peers: absent"
         if state == "running" and external_ip != "IP not assigned":
-            s3 = boto3.client("s3")
+            # Load SSH key from environment variable (expected to be Base64-encoded)
+            ssh_key_b64 = os.getenv("SSH_KEY")
+            if not ssh_key_b64:
+                log("SSH_KEY environment variable not set")
+                await update.message.reply_text("Error: SSH_KEY environment variable not set!", reply_markup=MAIN_KEYBOARD)
+                return
+            ssh_key = base64.b64decode(ssh_key_b64).decode("utf-8")
             key_file = "/tmp/wireguard-key.pem"
-            s3.download_file(S3_BUCKET, S3_KEY_PATH, key_file)
+            with open(key_file, "w") as f:
+                f.write(ssh_key)
             os.chmod(key_file, 0o400)
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -390,9 +415,16 @@ async def recreate_peers(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
 
         log(f"SSH recreate_peers, IP: {ec2_ip}")
-        s3 = boto3.client("s3")
+        # Load SSH key from environment variable (expected to be Base64-encoded)
+        ssh_key_b64 = os.getenv("SSH_KEY")
+        if not ssh_key_b64:
+            log("SSH_KEY environment variable not set")
+            await update.message.reply_text("Error: SSH_KEY environment variable not set!", reply_markup=MAIN_KEYBOARD)
+            return
+        ssh_key = base64.b64decode(ssh_key_b64).decode("utf-8")
         key_file = "/tmp/wireguard-key.pem"
-        s3.download_file(S3_BUCKET, S3_KEY_PATH, key_file)
+        with open(key_file, "w") as f:
+            f.write(ssh_key)
         os.chmod(key_file, 0o400)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
