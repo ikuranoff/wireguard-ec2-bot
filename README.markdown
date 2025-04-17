@@ -1,4 +1,4 @@
-# Ad-Hoc WireGuard EC2 Instance + Telegram Bot
+# WireGuard EC2 Bot
 
 This project is an experimental setup for creating a low-cost, ad-hoc VPN using **WireGuard** and **Pi-hole** on an AWS EC2 instance. It leverages AWS Lambda and a Telegram bot for convenient management, allowing you to start/stop the instance, recreate VPN peers, and fetch configuration files with minimal effort and cost.
 
@@ -185,6 +185,37 @@ The `bot` directory already contains all necessary dependencies (`python-telegra
 
    ```bash
    curl -X POST https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook -d url=<API_GATEWAY_URL>
+   ```
+
+#### Notes on Dependencies and Certificates
+
+The `bot` directory includes all required dependencies, including `cacert.pem` files used by `botocore` (for AWS API SSL verification) and `certifi` (for Telegram API SSL verification). These files are automatically included when you use the provided `lambda_package.zip` or `bot` directory.
+
+If you need to rebuild the dependencies (e.g., for a different Python version):
+
+1. Create a virtual environment and install the dependencies:
+
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install python-telegram-bot==20.7 paramiko boto3
+   ```
+
+2. Copy the dependencies to a new directory:
+
+   ```bash
+   mkdir lambda_package
+   cp -r venv/lib/python3.11/site-packages/* lambda_package/
+   cp lambda_function.py lambda_package/
+   ```
+
+   The `cacert.pem` files will be automatically included in the `botocore` and `certifi` directories.
+
+3. Create a new ZIP archive:
+
+   ```bash
+   cd lambda_package
+   zip -r ../lambda_package.zip .
    ```
 
 ### 3. Set Up Peer Activity Monitoring
