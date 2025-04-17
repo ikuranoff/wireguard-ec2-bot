@@ -56,40 +56,61 @@ To replicate this setup, you'll need:
 4. Set up WireGuard and Pi-hole using `docker-compose` in `/home/ubuntu/wireguard`. Example `docker-compose.yml`:
 
    ```yaml
-   version: '3'
-   services:
-     wireguard:
-       image: linuxserver/wireguard
-       container_name: wireguard
-       cap_add:
-         - NET_ADMIN
-         - SYS_MODULE
-       environment:
-         - PUID=1000
-         - PGID=1000
-         - TZ=Europe/London
-       volumes:
-         - ./wireguard:/config
-       ports:
-         - 51820:51820/udp
-       sysctls:
-         - net.ipv4.conf.all.src_valid_mark=1
-       restart: unless-stopped
-   
-     pihole:
-       image: pihole/pihole:latest
-       container_name: pihole
-       environment:
-         - TZ=Europe/London
-         - WEBPASSWORD=yourpassword
-       volumes:
-         - ./pihole:/etc/pihole
-         - ./dnsmasq.d:/etc/dnsmasq.d
-       ports:
-         - 53:53/tcp
-         - 53:53/udp
-         - 80:80/tcp
-       restart: unless-stopped
+version: "3.8"
+
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+    environment:
+      - TZ=Europe/Belgrade
+      - FTLCONF_webserver_api_password=yourpasswork
+      - FTLCONF_dns_listeningMode=all
+    volumes:
+      - ./pihole/etc-pihole:/etc/pihole
+      - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    networks:
+      vpn-net:
+        ipv4_address: 172.20.0.2
+
+  wireguard:
+    image: linuxserver/wireguard
+    container_name: wireguard
+    ports:
+      - "51820:51820/udp"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Belgrade
+      - SERVERURL=auto
+      - SERVERPORT=51820
+      - PEERS=7                  #How many peers will be generated on startup?
+      - PEERDNS=172.20.0.2       # Pi-hole as DNS
+    volumes:
+      - ./wireguard:/config
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    networks:
+      vpn-net:
+        ipv4_address: 172.20.0.3
+
+networks:
+  vpn-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
    ```
 
 5. Start the containers:
