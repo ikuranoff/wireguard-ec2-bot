@@ -55,7 +55,7 @@ To replicate this setup, you'll need:
 
 4. Set up WireGuard and Pi-hole using `docker-compose` in `/home/ubuntu/wireguard`. Example `docker-compose.yml`:
 
-   ```yaml
+```yaml
 version: "3.8"
 
 services:
