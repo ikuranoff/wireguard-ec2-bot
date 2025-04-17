@@ -1,4 +1,4 @@
-# WireGuard EC2 Bot
+# Ad-Hoc WireGuard EC2 Instance + Telegram Bot
 
 This project is an experimental setup for creating a low-cost, ad-hoc VPN using **WireGuard** and **Pi-hole** on an AWS EC2 instance. It leverages AWS Lambda and a Telegram bot for convenient management, allowing you to start/stop the instance, recreate VPN peers, and fetch configuration files with minimal effort and cost.
 
