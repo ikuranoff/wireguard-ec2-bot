@@ -91,8 +91,8 @@ services:
       - TZ=Europe/Belgrade
       - SERVERURL=auto
       - SERVERPORT=51820
-      - PEERS=7                  #How many peers will be generated on startup?
-      - PEERDNS=172.20.0.2       # Pi-hole as DNS
+      - PEERS=7    #How many peers will be generated on startup?
+      - PEERDNS=172.20.0.2   # Pi-hole as DNS
     volumes:
       - ./wireguard:/config
     cap_add:
