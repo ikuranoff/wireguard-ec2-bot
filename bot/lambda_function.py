@@ -21,7 +21,7 @@ import traceback
 # Replace the following with your own values
 TELEGRAM_TOKEN = "YOUR_TOKEN_HERE"  # Your Telegram bot token
 ALLOWED_CHAT_ID = "YOUR_CHAT_ID_HERE"  # Your Telegram chat ID
-SSH_USER = "Ubuntu"  # SSH user for EC2 instance (adjust if needed)
+SSH_USER = "ubuntu"  # SSH user for EC2 instance (adjust if needed)
 PEERS_DIR = "/home/ubuntu/wireguard/wireguard"  # Directory for WireGuard peers (adjust if needed)
 DOCKER_COMPOSE_DIR = "/home/ubuntu/wireguard"  # Directory for docker-compose.yml (adjust if needed)
 LOG_FILE = "/tmp/bot_log.txt"  # Log file path in Lambda
