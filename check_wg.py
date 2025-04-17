@@ -1,47 +1,47 @@
 #!/usr/bin/env python3
 
-# импортируем модули
-# subprocess: для `wg show`, `rm`, `shutdown`
-# re: для парсинга времени handshake
-# time: для timestamp
-# os: для проверки файлов
+# Import modules
+# subprocess: for running `wg show`, `rm`, `shutdown`
+# re: for parsing handshake time
+# time: for timestamp
+# os: for file checks
 import subprocess
 import re
 import time
 import os
 
-# константы
-# PEERS_DIR: папка с пирами
-# LOG_FILE: лог ошибок
-# HANDSHAKE_THRESHOLD: порог для handshake (60 минут = 3600 секунд)
+# Constants
+# PEERS_DIR: directory for peer files
+# LOG_FILE: log file path
+# HANDSHAKE_THRESHOLD: handshake threshold (60 minutes = 3600 seconds)
 PEERS_DIR = "/home/ubuntu/wireguard/wireguard"
 LOG_FILE = "/tmp/wg_check.log"
 HANDSHAKE_THRESHOLD = 3600
 
-# логирование
+# Logging function
 def log(message):
     try:
         with open(LOG_FILE, "a") as f:
             f.write(f"{time.ctime()}: {message}\n")
     except Exception as e:
-        pass  # Молча игнорируем ошибки логирования
+        pass  # Silently ignore logging errors
 
-# timestamp
+# Timestamp
 timestamp = int(time.time())
-log(f"Запуск скрипта, timestamp={timestamp}")
+log(f"Script started, timestamp={timestamp}")
 
-# проверяем время последнего запуска
+# Check the time of the last run
 last_run_file = "/tmp/wg_last_run"
 if os.path.exists(last_run_file):
     with open(last_run_file, "r") as f:
         last_run = int(f.read().strip())
     if timestamp - last_run < 60:
-        log(f"Слишком частый запуск, пропускаем (last_run={last_run})")
+        log(f"Too frequent run, skipping (last_run={last_run})")
         exit(0)
 with open(last_run_file, "w") as f:
     f.write(str(timestamp))
 
-# запускаем `wg show`
+# Run `wg show`
 try:
     wg_output = subprocess.run(
         ["docker", "exec", "wireguard", "wg", "show"],
@@ -50,17 +50,17 @@ try:
     ).stdout
     log(f"wg show: {wg_output[:100]}...")
 except Exception as e:
-    log(f"Ошибка wg show: {e}")
+    log(f"Error running wg show: {e}")
     exit(1)
 
-# парсим `wg show`
+# Parse `wg show` output
 current_peer = None
-all_peers_inactive = True  # флаг: все пиры неактивны
+all_peers_inactive = True  # Flag: all peers are inactive
 
 for line in wg_output.splitlines():
     if line.startswith("peer:"):
         current_peer = line.split("peer: ")[1].strip()
-        log(f"Начало пира: {current_peer}")
+        log(f"Starting peer: {current_peer}")
     elif "latest handshake:" in line and current_peer:
         match = re.search(r"latest handshake:\s*(.+)", line)
         if match:
@@ -68,7 +68,7 @@ for line in wg_output.splitlines():
             if handshake_time == "0 seconds ago":
                 seconds = 0
             else:
-                # парсим время handshake (например, "1 hour, 2 minutes, 34 seconds ago")
+                # Parse handshake time (e.g., "1 hour, 2 minutes, 34 seconds ago")
                 seconds = 0
                 if "hour" in handshake_time:
                     hours = int(re.search(r"(\d+)\s*hour", handshake_time).group(1))
@@ -81,16 +81,16 @@ for line in wg_output.splitlines():
                     if seconds_match:
                         seconds += int(seconds_match.group(1))
             
-            log(f"Пир {current_peer}: последний handshake {seconds} секунд назад")
+            log(f"Peer {current_peer}: latest handshake {seconds} seconds ago")
             if seconds < HANDSHAKE_THRESHOLD:
                 all_peers_inactive = False
-                log(f"Пир {current_peer} активен (handshake младше {HANDSHAKE_THRESHOLD} секунд)")
+                log(f"Peer {current_peer} is active (handshake younger than {HANDSHAKE_THRESHOLD} seconds)")
 
-# если handshake не найден для пира, считаем его неактивным
+# If no handshake is found for a peer, consider it inactive
 if all_peers_inactive:
-    log("Все пиры неактивны (handshake старше 60 минут или отсутствует)")
+    log("All peers are inactive (handshake older than 60 minutes or absent)")
     try:
-        # удаляем папку с пирами
+        # Delete the peers folder
         rm_result = subprocess.run(
             ["rm", "-rf", PEERS_DIR],
             capture_output=True,
@@ -98,7 +98,7 @@ if all_peers_inactive:
         )
         log(f"rm result: code={rm_result.returncode}, stderr={rm_result.stderr}")
         
-        # выключаем инстанс
+        # Shut down the instance
         shutdown_result = subprocess.run(
             ["sudo", "/sbin/shutdown", "now"],
             capture_output=True,
@@ -106,6 +106,6 @@ if all_peers_inactive:
         )
         log(f"shutdown result: code={shutdown_result.returncode}, stderr={shutdown_result.stderr}")
     except Exception as e:
-        log(f"Ошибка выключения: {e}")
+        log(f"Shutdown error: {e}")
 else:
-    log("Есть активные пиры, инстанс остаётся включённым")
+    log("Active peers found, instance remains running")
