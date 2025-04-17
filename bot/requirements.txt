@@ -1,0 +1,5 @@
+python-telegram-bot==20.7
+paramiko==3.5.1
+requests==2.32.3
+boto3==1.37.34
+charset-normalizer==2.0.12В
