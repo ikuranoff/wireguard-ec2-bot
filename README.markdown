@@ -120,6 +120,89 @@ networks:
    docker-compose up -d
    ```
 
+#### Configure Security Group
+
+To allow traffic to your EC2 instance, configure its Security Group to permit the necessary ports for WireGuard, Pi-hole, and SSH access:
+
+1. In the AWS EC2 Console, go to **Instances**, select your instance, and click on the associated Security Group under the "Security" tab.
+2. Click "Edit inbound rules" and add the following rules:
+   - **SSH (port 22)**: Type: SSH, Protocol: TCP, Port Range: 22, Source: `0.0.0.0/0` (or restrict to your IP for better security).
+   - **WireGuard (port 51820)**: Type: Custom UDP Rule, Protocol: UDP, Port Range: 51820, Source: `0.0.0.0/0` (or restrict to your client IPs).
+3. Save the rules.
+
+**Note**: For better security, consider restricting the Source to your specific IP address or a CIDR range instead of `0.0.0.0/0` (which allows access from anywhere). However, if your IP address changes frequently (e.g., using a mobile network), you may need to update the rules accordingly.
+
+
+#### Bootstrap EC2 Instance with User Data (Optional)
+
+To automate the setup of your EC2 instance, you can use the following user data script. This script will install Docker, Docker Compose, set up WireGuard and Pi-hole, download `check_wg.py`, and configure a cron job to monitor peer activity.
+
+1. In the AWS EC2 Console, while launching your instance, go to **Advanced Details** → **User Data**.
+2. Paste the following script into the user data field (ensure your instance has internet access):
+
+   ```bash
+   #!/bin/bash
+   # Update system and install dependencies
+   apt-get update -y
+   apt-get install -y docker.io docker-compose
+   systemctl enable docker
+   systemctl start docker
+   usermod -aG docker ubuntu
+
+   # Create WireGuard directory and set up docker-compose.yml
+   mkdir -p /home/ubuntu/wireguard
+   cd /home/ubuntu/wireguard
+   cat <<EOF > docker-compose.yml
+   version: '3'
+   services:
+     wireguard:
+       image: linuxserver/wireguard
+       container_name: wireguard
+       cap_add:
+         - NET_ADMIN
+         - SYS_MODULE
+       environment:
+         - PUID=1000
+         - PGID=1000
+         - TZ=Europe/London
+       volumes:
+         - ./wireguard:/config
+       ports:
+         - 51820:51820/udp
+       sysctls:
+         - net.ipv4.conf.all.src_valid_mark=1
+       restart: unless-stopped
+   
+     pihole:
+       image: pihole/pihole:latest
+       container_name: pihole
+       environment:
+         - TZ=Europe/London
+         - WEBPASSWORD=yourpassword
+       volumes:
+         - ./pihole:/etc/pihole
+         - ./dnsmasq.d:/etc/dnsmasq.d
+       ports:
+         - 53:53/tcp
+         - 53:53/udp
+         - 80:80/tcp
+       restart: unless-stopped
+   EOF
+
+   # Start containers
+   docker-compose up -d
+
+   # Download check_wg.py from GitHub
+   curl -o /home/ubuntu/wireguard/check_wg.py https://raw.githubusercontent.com/ikuranoff/wireguard-ec2-bot/main/check_wg.py
+   chmod +x /home/ubuntu/wireguard/check_wg.py
+
+   # Set up cron job for check_wg.py (run every 5 minutes)
+   (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/python3 /home/ubuntu/wireguard/check_wg.py") | crontab -
+
+   # Set proper ownership
+   chown -R ubuntu:ubuntu /home/ubuntu/wireguard
+
+
 ### 2. Set Up Telegram Bot
 
 The bot code and dependencies are included in the `bot` directory, ready for deployment to AWS Lambda.
@@ -128,7 +211,7 @@ The bot code and dependencies are included in the `bot` directory, ready for dep
 
 1. Clone this repository or download the `bot` directory:
 
-   ```bash
+```bash
    git clone https://github.com/ikuranoff/wireguard-ec2-bot.git
    cd wireguard-ec2-bot/bot
    ```
